@@ -38,6 +38,11 @@ func run() error {
 	server := app.NewServer(router, indexService)
 
 	// run server
-	return server.Run(*serverPort)
+	err = server.Run(*serverPort)
+	if err != nil {
+		return err
+	}
+
+	return nil
 
 }
