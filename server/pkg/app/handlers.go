@@ -32,3 +32,17 @@ func (s *Server) ping() http.HandlerFunc {
 		wJSON(w, m, http.StatusOK)
 	}
 }
+
+func (s *Server) indexMail() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := s.indexService.IndexMail()
+		if err != nil {
+			log.Printf("Error indexing mail: %v", err)
+			http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+			return
+		}
+
+		m := m{"message": "success"}
+		wJSON(w, m, http.StatusOK)
+	}
+}
