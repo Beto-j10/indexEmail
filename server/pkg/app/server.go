@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"server/config"
 	"server/pkg/api"
 
 	"github.com/go-chi/chi/middleware"
@@ -15,20 +16,22 @@ import (
 type Server struct {
 	router       *chi.Mux
 	indexService api.IndexService
+	config       config.Config
 }
 
 // NewServer creates a new server
-func NewServer(router *chi.Mux, indexService api.IndexService) *Server {
+func NewServer(router *chi.Mux, indexService api.IndexService, config *config.Config) *Server {
 	return &Server{
 		router:       router,
 		indexService: indexService,
+		config:       *config,
 	}
 }
 
 // Run starts the server
 func (s *Server) Run(port string) error {
 
-	s.config()
+	s.configServer()
 	router := s.routes()
 
 	log.Printf("Server is running on port %v", port)
@@ -41,7 +44,7 @@ func (s *Server) Run(port string) error {
 	return nil
 }
 
-func (s *Server) config() {
+func (s *Server) configServer() {
 
 	// stack middleware
 	s.router.Use(middleware.RequestID)

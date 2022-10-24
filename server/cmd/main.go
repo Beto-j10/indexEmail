@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
@@ -25,9 +24,6 @@ func run() error {
 		return err
 	}
 
-	serverPort := flag.String("port", config.Server.Port, "server port")
-	flag.Parse()
-
 	// create router
 	router := chi.NewRouter()
 
@@ -35,10 +31,10 @@ func run() error {
 	indexService := api.NewIndexService()
 
 	// create server
-	server := app.NewServer(router, indexService)
+	server := app.NewServer(router, indexService, config)
 
 	// run server
-	err = server.Run(*serverPort)
+	err = server.Run(config.Server.Port)
 	if err != nil {
 		return err
 	}
