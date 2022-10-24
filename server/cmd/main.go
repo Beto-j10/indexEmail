@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"server/config"
-	"server/pkg/api"
 	"server/pkg/app"
+	api "server/pkg/services"
 
 	"github.com/go-chi/chi/v5"
 )

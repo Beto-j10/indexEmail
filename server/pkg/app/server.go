@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"server/config"
-	"server/pkg/api"
+	"server/pkg/services"
 
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
@@ -15,12 +15,12 @@ import (
 
 type Server struct {
 	router       *chi.Mux
-	indexService api.IndexService
+	indexService services.IndexService
 	config       config.Config
 }
 
 // NewServer creates a new server
-func NewServer(router *chi.Mux, indexService api.IndexService, config *config.Config) *Server {
+func NewServer(router *chi.Mux, indexService services.IndexService, config *config.Config) *Server {
 	return &Server{
 		router:       router,
 		indexService: indexService,
