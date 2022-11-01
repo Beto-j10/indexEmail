@@ -2,9 +2,11 @@ package services
 
 import (
 	"bufio"
+	"io"
 	"io/fs"
 	"log"
 	"os"
+	"server/config"
 	"sync/atomic"
 
 	"golang.org/x/sync/errgroup"
@@ -15,15 +17,18 @@ type IndexService interface {
 }
 
 type indexService struct {
+	config config.Config
 }
 
-func NewIndexService() IndexService {
-	return &indexService{}
+func NewIndexService(config *config.Config) IndexService {
+	return &indexService{
+		config: *config,
+	}
 }
 
-func (s *indexService) IndexMail() error {
+func (i *indexService) IndexMail() error {
 
-	dirPath := "<path>"
+	dirPath := i.config.Server.Dir
 	root := "maildir"
 	fileSystem := os.DirFS(dirPath)
 	// through all directories
@@ -37,7 +42,7 @@ func (s *indexService) IndexMail() error {
 	}
 
 	var countFiles uint64
-	c := make(chan int, 5)
+	c := make(chan int, 10)
 	// var wg sync.WaitGroup
 	eg := &errgroup.Group{}
 	var countDir uint64
@@ -106,19 +111,17 @@ func (s *indexService) IndexMail() error {
 								}
 								defer file.Close()
 
-								scanner := bufio.NewScanner(file)
-								lineNumber := 0
-								for scanner.Scan() {
-									lineNumber++
-									// line := scanner.Text()
-									// if strings.HasPrefix(line, "To:") {
-									// fmt.Println(line)
-									// }
-								}
-
-								if err := scanner.Err(); err != nil {
-									log.Printf("Error scanning file in the line %v: %v", lineNumber, err)
-									return err
+								reader := bufio.NewReader(file)
+								for {
+									_, err := read(reader)
+									if err != nil {
+										if err == io.EOF {
+											break
+										}
+										log.Printf("Error reading file: %v", err)
+										return err
+									}
+									// log.Printf("Line: %v", string(line))
 								}
 
 								// log.Printf("File: %v dirName:%v", path, w.dirName)
@@ -153,4 +156,17 @@ func (s *indexService) IndexMail() error {
 	log.Printf("Total directories: %v", countDir)
 
 	return nil
+}
+
+func read(r *bufio.Reader) ([]byte, error) {
+	var (
+		isPrefix bool  = true
+		err      error = nil
+		line, ln []byte
+	)
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.ReadLine()
+		ln = append(ln, line...)
+	}
+	return ln, err
 }
