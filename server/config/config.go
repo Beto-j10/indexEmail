@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"os"
 
@@ -16,6 +17,7 @@ type Zinc struct {
 // ServerConfig is the config for the server
 type ServerConfig struct {
 	Port string `yaml:"port"`
+	Dir  string `yaml:"dir"`
 }
 
 // Config contains the configuration for the server
@@ -38,10 +40,22 @@ func LoadConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 
-	config.Server.Port = *flag.String("port", config.Server.Port, "server port")
-	config.Zinc.ZincPort = *flag.String("zincPort", config.Zinc.ZincPort, "zinc port")
-	config.Zinc.Target = *flag.String("target", config.Zinc.Target, "target")
+	serverPort := flag.String("port", config.Server.Port, "server port")
+	serverDir := flag.String("dir", "default", "server directory")
+	zincPort := flag.String("zincPort", config.Zinc.ZincPort, "zinc port")
+	zincTarget := flag.String("target", config.Zinc.Target, "target")
+
 	flag.Parse()
+
+	config.Server.Port = *serverPort
+	config.Server.Dir = *serverDir
+	config.Zinc.ZincPort = *zincPort
+	config.Zinc.Target = *zincTarget
+
+	if config.Server.Dir == "default" {
+		err := errors.New("please specify a directory to index: -dir=<path>")
+		return nil, err
+	}
 
 	return config, nil
 }

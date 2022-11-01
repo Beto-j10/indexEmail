@@ -28,7 +28,7 @@ func run() error {
 	router := chi.NewRouter()
 
 	// create services
-	indexService := api.NewIndexService()
+	indexService := api.NewIndexService(config)
 
 	// create server
 	server := app.NewServer(router, indexService, config)
