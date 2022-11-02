@@ -19,7 +19,7 @@ func main() {
 }
 
 func run() error {
-	config, err := config.LoadConfig("../config.yml")
+	config, err := config.LoadConfig("./config.yml")
 	if err != nil {
 		return err
 	}
