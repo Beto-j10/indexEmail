@@ -9,23 +9,29 @@ import (
 	"os"
 	"path/filepath"
 	"server/config"
+	"server/pkg/email"
+	"server/pkg/storage"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/errgroup"
 )
 
+// IndexMail indexes all the mail in the maildir.
 type IndexService interface {
 	IndexMail() error
 }
 
 type indexService struct {
-	config config.Config
+	config  config.Config
+	storage storage.Storage
 }
 
-func NewIndexService(config *config.Config) IndexService {
+func NewIndexService(config *config.Config, storage storage.Storage) IndexService {
 	return &indexService{
-		config: *config,
+		config:  *config,
+		storage: storage,
 	}
 }
 
@@ -68,21 +74,6 @@ func (i *indexService) IndexMail() error {
 
 			for _, subDir := range d {
 				if subDir.IsDir() {
-
-					// log.Printf("subDir: %v", subDir.Name())
-
-					//TODO check performance
-					// var fsysStr strings.Builder
-					// fsysStr.WriteString(dirPath)
-					// fsysStr.WriteString("/")
-					// fsysStr.WriteString(root)
-					// fsysStr.WriteString("/")
-					// fsysStr.WriteString(dir.Name())
-					// fsysStr.WriteString("/")
-					// fsysStr.WriteString(subDir.Name())
-
-					// fileSystem := os.DirFS(fsysStr.String())
-					// progress in percent
 					fmt.Printf("\rProgress: %.1f%%", (float32(countFiles)/float32(totalFiles))*100)
 					fileSystem := os.DirFS(dirPath + "/" + root + "/" + dir.Name() + "/" + subDir.Name())
 
@@ -106,13 +97,11 @@ func (i *indexService) IndexMail() error {
 								}
 
 							} else {
-
-								// check extension
-								// if filepath.Ext(path) == "." {
-								// 		// println(path)
-								// 		// countFiles++
-								// 	}
-								err := openFile(fileSystem, path, &countFiles)
+								email, err := openFile(fileSystem, path, &countFiles)
+								if err != nil {
+									return err
+								}
+								err = i.storage.Indexer(email)
 								if err != nil {
 									return err
 								}
@@ -131,10 +120,11 @@ func (i *indexService) IndexMail() error {
 
 				} else { //if no, there is file in user root
 					fileSystem := os.DirFS(dirPath + "/" + root + "/" + dir.Name())
-					err := openFile(fileSystem, subDir.Name(), &countFiles)
+					email, err := openFile(fileSystem, subDir.Name(), &countFiles)
 					if err != nil {
 						return err
 					}
+					fmt.Printf("\rDoc: %v", email)
 				}
 			}
 		}
@@ -151,29 +141,67 @@ func (i *indexService) IndexMail() error {
 	return nil
 }
 
-func openFile(fileSystem fs.FS, path string, countFiles *uint64) error {
+func openFile(fileSystem fs.FS, path string, countFiles *uint64) (*email.Email, error) {
 	file, err := fileSystem.Open(path)
 	if err != nil {
 		log.Printf("Error opening file: %v", err)
-		return err
+		return nil, err
 	}
 	defer file.Close()
 
+	isHeaderEmail := true
+	headerType := ""
+	doc := &email.Email{}
+
 	reader := bufio.NewReader(file)
 	for {
-		_, err := read(reader)
+		line, err := read(reader)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			log.Printf("Error reading file: %v", err)
-			return err
+			return nil, err
 		}
-		// log.Printf("Line: %v", string(line))
+		if len(line) == 0 {
+			isHeaderEmail = false
+		}
+		if isHeaderEmail {
+			lineSize := len(line)
+			var prefixLine string
+			if lineSize >= 13 {
+				prefixLine = string(line[:13])
+			} else {
+				prefixLine = string(line[:lineSize])
+			}
+			switch {
+			case strings.HasPrefix(prefixLine, "Date:"):
+				headerType = "Date"
+			case strings.HasPrefix(prefixLine, "From:"):
+				headerType = "From"
+			case strings.HasPrefix(prefixLine, "To:"):
+				headerType = "To"
+			case strings.HasPrefix(prefixLine, "Subject:"):
+				headerType = "Subject"
+			case strings.HasPrefix(prefixLine, "Mime-Version:"):
+				isHeaderEmail = false
+			}
+			switch headerType {
+			case "Date":
+				doc.Date += string(line)
+			case "From":
+				doc.From += string(line)
+			case "To":
+				doc.To += string(line)
+			case "Subject":
+				doc.Subject += string(line)
+
+			}
+		}
 	}
 
 	atomic.AddUint64(countFiles, 1)
-	return nil
+	return doc, nil
 }
 
 func read(r *bufio.Reader) ([]byte, error) {

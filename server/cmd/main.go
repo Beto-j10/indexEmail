@@ -7,6 +7,7 @@ import (
 	"server/config"
 	"server/pkg/app"
 	api "server/pkg/services"
+	"server/pkg/storage"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -27,8 +28,10 @@ func run() error {
 	// create router
 	router := chi.NewRouter()
 
+	storage := storage.NewStorage()
+
 	// create services
-	indexService := api.NewIndexService(config)
+	indexService := api.NewIndexService(config, storage)
 
 	// create server
 	server := app.NewServer(router, indexService, config)
