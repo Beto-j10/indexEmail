@@ -28,7 +28,8 @@ func run() error {
 	// create router
 	router := chi.NewRouter()
 
-	storage := storage.NewStorage()
+	// create storage
+	storage := storage.NewStorage(config)
 
 	// create services
 	indexService := api.NewIndexService(config, storage)

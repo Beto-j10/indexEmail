@@ -28,6 +28,13 @@ type indexService struct {
 	storage storage.Storage
 }
 
+type fillEmail struct {
+	email      *email.Email
+	line       []byte
+	headerType string
+	startByte  int
+}
+
 func NewIndexService(config *config.Config, storage storage.Storage) IndexService {
 	return &indexService{
 		config:  *config,
@@ -84,6 +91,7 @@ func (i *indexService) IndexMail() error {
 					eg.Go(func() error {
 
 						// defer wg.Done()
+						emails := &email.EmailList{}
 
 						err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 							if err != nil {
@@ -101,10 +109,8 @@ func (i *indexService) IndexMail() error {
 								if err != nil {
 									return err
 								}
-								err = i.storage.Indexer(email)
-								if err != nil {
-									return err
-								}
+								emails.Emails = append(emails.Emails, *email)
+
 							}
 
 							return nil
@@ -115,17 +121,23 @@ func (i *indexService) IndexMail() error {
 							return err
 						}
 						<-c
+						// fmt.Printf("\n\n\nemails: %v", emails)
+						err = i.storage.Indexer(emails)
+						if err != nil {
+							log.Printf("Error indexing emails: %v", err)
+							return err
+						}
 						return nil
 					})
 
-				} else { //if no, there is file in user root
+				} /* else { //if no, there is file in user root
 					fileSystem := os.DirFS(dirPath + "/" + root + "/" + dir.Name())
 					email, err := openFile(fileSystem, subDir.Name(), &countFiles)
 					if err != nil {
 						return err
 					}
 					fmt.Printf("\rDoc: %v", email)
-				}
+				} */
 			}
 		}
 	}
@@ -150,12 +162,15 @@ func openFile(fileSystem fs.FS, path string, countFiles *uint64) (*email.Email, 
 	defer file.Close()
 
 	isHeaderEmail := true
-	headerType := ""
-	doc := &email.Email{}
+	isBodyEmail := false
+	// headerType := ""
+	fillEmail := &fillEmail{
+		email: &email.Email{},
+	}
 
 	reader := bufio.NewReader(file)
 	for {
-		line, err := read(reader)
+		fillEmail.line, err = read(reader)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -163,45 +178,51 @@ func openFile(fileSystem fs.FS, path string, countFiles *uint64) (*email.Email, 
 			log.Printf("Error reading file: %v", err)
 			return nil, err
 		}
-		if len(line) == 0 {
-			isHeaderEmail = false
+		if !isBodyEmail && len(fillEmail.line) == 0 {
+			isBodyEmail = true
 		}
 		if isHeaderEmail {
-			lineSize := len(line)
+			lineSize := len(fillEmail.line)
 			var prefixLine string
 			if lineSize >= 13 {
-				prefixLine = string(line[:13])
+				prefixLine = string(fillEmail.line[:13])
 			} else {
-				prefixLine = string(line[:lineSize])
+				prefixLine = string(fillEmail.line[:lineSize])
 			}
 			switch {
 			case strings.HasPrefix(prefixLine, "Date:"):
-				headerType = "Date"
+				fillEmail.startByte = 5
+				fillEmail.headerType = "Date"
+				fillEmail.fillEmails()
 			case strings.HasPrefix(prefixLine, "From:"):
-				headerType = "From"
+				fillEmail.startByte = 5
+				fillEmail.headerType = "From"
+				fillEmail.fillEmails()
 			case strings.HasPrefix(prefixLine, "To:"):
-				headerType = "To"
+				fillEmail.startByte = 3
+				fillEmail.headerType = "To"
+				fillEmail.fillEmails()
 			case strings.HasPrefix(prefixLine, "Subject:"):
-				headerType = "Subject"
-			case strings.HasPrefix(prefixLine, "Mime-Version:"):
+				fillEmail.startByte = 8
+				fillEmail.headerType = "Subject"
+				fillEmail.fillEmails()
+			case strings.HasPrefix(prefixLine, "Mime-Version:") || strings.HasPrefix(prefixLine, "Cc:"):
+				fillEmail.startByte = 0
+				fillEmail.headerType = ""
 				isHeaderEmail = false
-			}
-			switch headerType {
-			case "Date":
-				doc.Date += string(line)
-			case "From":
-				doc.From += string(line)
-			case "To":
-				doc.To += string(line)
-			case "Subject":
-				doc.Subject += string(line)
+			default:
+				fillEmail.startByte = 0
+				fillEmail.fillEmails()
 
 			}
+		}
+		if isBodyEmail {
+			fillEmail.email.Body += string(fillEmail.line)
 		}
 	}
 
 	atomic.AddUint64(countFiles, 1)
-	return doc, nil
+	return fillEmail.email, nil
 }
 
 func read(r *bufio.Reader) ([]byte, error) {
@@ -215,6 +236,19 @@ func read(r *bufio.Reader) ([]byte, error) {
 		ln = append(ln, line...)
 	}
 	return ln, err
+}
+
+func (f *fillEmail) fillEmails() {
+	switch f.headerType {
+	case "Date":
+		f.email.Date += string(f.line[f.startByte:])
+	case "From":
+		f.email.From += string(f.line[f.startByte:])
+	case "To":
+		f.email.To += string(f.line[f.startByte:])
+	case "Subject":
+		f.email.Subject += string(f.line[f.startByte:])
+	}
 }
 
 func countFiles(fileSystem fs.FS) (uint64, error) {

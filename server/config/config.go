@@ -10,8 +10,11 @@ import (
 
 // Zinc is the configuration for the ZincSearch server
 type Zinc struct {
-	ZincPort string `yaml:"zincPort"`
-	Target   string `yaml:"target"`
+	ZincHost  string `yaml:"zincHost"`
+	Target    string `yaml:"target"`
+	DocCreate string `yaml:"doc_create"`
+	User      string `yaml:"user"`
+	Password  string `yaml:"password"`
 }
 
 // ServerConfig is the config for the server
@@ -42,14 +45,14 @@ func LoadConfig(filename string) (*Config, error) {
 
 	serverPort := flag.String("port", config.Server.Port, "server port")
 	serverDir := flag.String("dir", "default", "server directory")
-	zincPort := flag.String("zincPort", config.Zinc.ZincPort, "zinc port")
+	zincHost := flag.String("zincHost", config.Zinc.ZincHost, "zinc host")
 	zincTarget := flag.String("target", config.Zinc.Target, "target")
 
 	flag.Parse()
 
 	config.Server.Port = *serverPort
 	config.Server.Dir = *serverDir
-	config.Zinc.ZincPort = *zincPort
+	config.Zinc.ZincHost = *zincHost
 	config.Zinc.Target = *zincTarget
 
 	if config.Server.Dir == "default" {
