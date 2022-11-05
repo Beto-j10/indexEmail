@@ -3,13 +3,14 @@ package storage
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"server/config"
 	"server/pkg/email"
 )
 
 type Storage interface {
-	Indexer(*email.EmailList) error
+	Indexer(*email.EmailList)
 	SearchMail() error
 }
 
@@ -23,17 +24,17 @@ func NewStorage(config *config.Config) Storage {
 	}
 }
 
-func (s *storage) Indexer(emails *email.EmailList) error {
+func (s *storage) Indexer(emails *email.EmailList) {
 	URL := s.config.Zinc.ZincHost + s.config.Zinc.Target + s.config.Zinc.DocCreate
 	requestBody, err := json.Marshal(emails)
 	if err != nil {
-		return err
+		log.Panicf("error marshalling email: %v", err)
 	}
 
 	client := &http.Client{}
 	request, err := http.NewRequest("POST", URL, bytes.NewBuffer(requestBody))
 	if err != nil {
-		return err
+		log.Panicf("error creating request: %v", err)
 	}
 
 	request.Header.Set("Content-Type", "application/json")
@@ -42,10 +43,8 @@ func (s *storage) Indexer(emails *email.EmailList) error {
 
 	_, err = client.Do(request)
 	if err != nil {
-		return err
+		log.Panicf("error sending request: %v", err)
 	}
-
-	return nil
 }
 
 func (s *storage) SearchMail() error {
