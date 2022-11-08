@@ -97,12 +97,17 @@ func worker(jobs <-chan string, result chan<- *email.Email) {
 		b             strings.Builder
 		lineSize      int
 		prefixLine    string
-		isHeaderEmail bool       = true
-		isBodyEmail   bool       = false
-		fillEmail     *fillEmail = &fillEmail{
-			email: &email.Email{},
-		}
+		isHeaderEmail bool = true
+		isBodyEmail   bool = false
+
+		isPrefix bool  = true
+		errRead  error = nil
+		line, ln []byte
 	)
+
+	fillEmail := &fillEmail{
+		email: &email.Email{},
+	}
 
 	for path := range jobs {
 		file, err := os.Open(path)
@@ -116,13 +121,29 @@ func worker(jobs <-chan string, result chan<- *email.Email) {
 
 		reader := bufio.NewReader(file)
 		for {
-			fillEmail.line, err = read(reader)
-			if err != nil {
-				if err == io.EOF {
+			isPrefix = true
+			errRead = nil
+			line = nil
+			ln = nil
+			// var (
+			// 	isPrefix bool  = true
+			// 	errRead  error = nil
+			// 	line, ln []byte
+			// )
+			for isPrefix && errRead == nil {
+				line, isPrefix, errRead = reader.ReadLine()
+				ln = append(ln, line...)
+			}
+
+			if errRead != nil {
+				if errRead == io.EOF {
 					break
 				}
-				log.Panicf("Error reading file: %v", err)
+				log.Panicf("Error reading file: %v", errRead)
 			}
+
+			fillEmail.line = ln
+
 			if !isBodyEmail && len(fillEmail.line) == 0 {
 				isBodyEmail = true
 			}
@@ -176,18 +197,18 @@ func worker(jobs <-chan string, result chan<- *email.Email) {
 	}
 }
 
-func read(r *bufio.Reader) ([]byte, error) {
-	var (
-		isPrefix bool  = true
-		err      error = nil
-		line, ln []byte
-	)
-	for isPrefix && err == nil {
-		line, isPrefix, err = r.ReadLine()
-		ln = append(ln, line...)
-	}
-	return ln, err
-}
+// func read(r *bufio.Reader) ([]byte, error) {
+// 	var (
+// 		isPrefix bool  = true
+// 		err      error = nil
+// 		line, ln []byte
+// 	)
+// 	for isPrefix && err == nil {
+// 		line, isPrefix, err = r.ReadLine()
+// 		ln = append(ln, line...)
+// 	}
+// 	return ln, err
+// }
 
 func (f *fillEmail) fillEmails() {
 	// var b strings.Builder
