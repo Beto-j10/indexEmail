@@ -9,5 +9,6 @@ type Email struct {
 }
 
 type EmailList struct {
+	Index  string  `json:"index"`
 	Emails []Email `json:"records"`
 }

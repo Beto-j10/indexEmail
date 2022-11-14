@@ -46,3 +46,17 @@ func (s *Server) indexMail() http.HandlerFunc {
 		wJSON(w, m, http.StatusOK)
 	}
 }
+
+func (s *Server) indexer() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := s.indexService.Indexer()
+		if err != nil {
+			log.Printf("Error indexer: %v", err)
+			http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+			return
+		}
+
+		m := m{"message": "success"}
+		wJSON(w, m, http.StatusOK)
+	}
+}
