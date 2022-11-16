@@ -13,6 +13,7 @@ type Zinc struct {
 	ZincHost  string `yaml:"zincHost"`
 	Target    string `yaml:"target"`
 	DocCreate string `yaml:"doc_create"`
+	Search    string `yaml:"search"`
 	User      string `yaml:"user"`
 	Password  string `yaml:"password"`
 }

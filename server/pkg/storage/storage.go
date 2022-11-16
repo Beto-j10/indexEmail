@@ -1,17 +1,21 @@
 package storage
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"server/config"
+	def "server/pkg/definitions"
+	"strings"
 	"sync"
 )
 
 type Storage interface {
 	Indexer()
-	SearchMail() error
+	SearchMail(*def.Search) (*def.SearchResponse, error)
 }
 
 type storage struct {
@@ -24,83 +28,58 @@ func NewStorage(config *config.Config) Storage {
 	}
 }
 
-// func (s *storage) Indexer(emails email.EmailList, c <-chan int) {
-// 	URL := s.config.Zinc.ZincHost + s.config.Zinc.Target + s.config.Zinc.DocCreate
-// 	requestBody, err := json.Marshal(emails)
-// 	if err != nil {
-// 		log.Panicf("error marshalling email: %v", err)
-// 	}
+func (s *storage) SearchMail(search *def.Search) (*def.SearchResponse, error) {
 
-// 	client := &http.Client{}
-// 	request, err := http.NewRequest("POST", URL, bytes.NewBuffer(requestBody))
-// 	if err != nil {
-// 		log.Panicf("error creating request: %v", err)
-// 	}
+	requestbody, err := json.Marshal(search)
+	if err != nil {
+		log.Printf("error marshalling search: %v", err)
+		return nil, err
+	}
 
-// 	request.Header.Set("Content-Type", "application/json")
-// 	request.Header.Set("Accept", "application/json")
-// 	request.SetBasicAuth(s.config.Zinc.User, s.config.Zinc.Password)
+	b := strings.Builder{}
+	b.WriteString(s.config.Zinc.ZincHost)
+	b.WriteString(s.config.Zinc.Target)
+	b.WriteString(s.config.Zinc.Search)
 
-// 	_, err = client.Do(request)
-// 	if err != nil {
-// 		log.Panicf("error sending request: %v", err)
-// 	}
-// 	<-c
-// }
+	URL := b.String()
 
-// func (s *storage) Indexer() {
-// 	files, err := os.ReadDir("./emails")
-// 	if err != nil {
-// 		log.Panicf("error reading directory: %v", err)
-// 	}
+	client := &http.Client{}
 
-// 	for _, file := range files {
-// 		// if file.Name() == "index-final.json" {
-// 		fmt.Println(file.Name())
+	request, err := http.NewRequest("POST", URL, bytes.NewBuffer(requestbody))
+	if err != nil {
+		log.Printf("error creating request: %v", err)
+		return nil, err
+	}
 
-// 		URL := s.config.Zinc.ZincHost + s.config.Zinc.DocCreate
-// 		// requestBody, err := json.Marshal(emails)
-// 		// if err != nil {
-// 		// 	log.Panicf("error marshalling email: %v", err)
-// 		// }
+	request.SetBasicAuth(s.config.Zinc.User, s.config.Zinc.Password)
+	request.Header.Set("Content-Type", "application/json")
 
-// 		file, err := os.Open("./emails/" + file.Name())
-// 		if err != nil {
-// 			log.Panicf("error opening file: %v", err)
-// 		}
+	response, err := client.Do(request)
+	if err != nil {
+		log.Printf("error sending request: %v", err)
+		return nil, err
+	}
 
-// 		client := &http.Client{}
-// 		request, err := http.NewRequest("POST", URL, file)
-// 		if err != nil {
-// 			log.Panicf("error creating request: %v", err)
-// 		}
+	defer response.Body.Close()
 
-// 		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-// 		// request.Header.Set("Accept", "application/json")
-// 		request.SetBasicAuth(s.config.Zinc.User, s.config.Zinc.Password)
+	resp := &def.SearchResponse{}
 
-// 		response, err := client.Do(request)
-// 		if err != nil {
-// 			log.Panicf("error sending request: %v", err)
-// 		}
+	err = json.NewDecoder(response.Body).Decode(resp)
+	if err != nil {
+		log.Printf("error decoding response: %v", err)
+		return nil, err
+	}
 
-// 		fmt.Println(response.Status)
-// 		file.Close()
-// 		response.Body.Close()
+	fmt.Printf("Search results: %v \n", resp)
 
-// 		// }
-// 	}
+	return resp, nil
 
-// }
-
-func (s *storage) SearchMail() error {
-	return nil
 }
 
 func (s *storage) Indexer() {
 	files, err := os.ReadDir("./emails")
 	if err != nil {
-		log.Panicf("error reading directory: %v", err)
+		log.Panicf("error reading directory: %+v", err)
 	}
 
 	c := make(chan int, 4)
@@ -111,8 +90,13 @@ func (s *storage) Indexer() {
 		c <- 1
 		go func(fileName string) {
 			defer wg.Done()
+			b := strings.Builder{}
+			b.WriteString(s.config.Zinc.ZincHost)
+			b.WriteString(s.config.Zinc.Target)
+			b.WriteString(s.config.Zinc.DocCreate)
 
-			URL := s.config.Zinc.ZincHost + s.config.Zinc.DocCreate
+			URL := b.String()
+
 			// requestBody, err := json.Marshal(emails)
 			// if err != nil {
 			// 	log.Panicf("error marshalling email: %v", err)

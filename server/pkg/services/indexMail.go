@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"server/config"
-	"server/pkg/email"
+	def "server/pkg/definitions"
 	"server/pkg/storage"
 	"strings"
 	"sync"
@@ -21,6 +21,7 @@ import (
 type IndexService interface {
 	IndexMail() error
 	Indexer() error
+	SearchMail(query *def.Query) (*def.SearchResponse, error)
 }
 
 type indexService struct {
@@ -29,14 +30,14 @@ type indexService struct {
 }
 
 type fillEmail struct {
-	email      *email.Email
+	email      *def.Email
 	line       []byte
 	headerType string
 	startByte  int
 }
 
 func (f *fillEmail) reset() {
-	f.email = &email.Email{}
+	f.email = &def.Email{}
 	f.line = nil
 	f.headerType = ""
 	f.startByte = 0
@@ -61,7 +62,7 @@ func (i *indexService) IndexMail() error {
 
 	nWorkers := 4
 	jobs := make(chan string, 50)
-	results := make(chan *email.Email, 50)
+	results := make(chan *def.Email, 50)
 
 	wg := sync.WaitGroup{}
 	wg2 := sync.WaitGroup{}
@@ -103,7 +104,7 @@ func (i *indexService) IndexMail() error {
 	return nil
 }
 
-func worker(jobs <-chan string, result chan<- *email.Email, wg *sync.WaitGroup) {
+func worker(jobs <-chan string, result chan<- *def.Email, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
@@ -120,7 +121,7 @@ func worker(jobs <-chan string, result chan<- *email.Email, wg *sync.WaitGroup) 
 	)
 
 	fillEmail := &fillEmail{
-		email: &email.Email{},
+		email: &def.Email{},
 	}
 
 	buff := make([]byte, 500*1024)
@@ -244,13 +245,11 @@ func (f *fillEmail) fillEmails(b *strings.Builder) {
 	}
 }
 
-func createFiles(result <-chan *email.Email, wg *sync.WaitGroup) {
+func createFiles(result <-chan *def.Email, wg *sync.WaitGroup) {
 
 	defer wg.Done()
 
-	emailList := &email.EmailList{
-		Index: "emails",
-	}
+	emailList := &def.EmailList{}
 	counter := 0
 	batch := 0
 	c := make(chan int, 5)
@@ -263,7 +262,7 @@ func createFiles(result <-chan *email.Email, wg *sync.WaitGroup) {
 			name := fmt.Sprintf("./emails/index-%d.json", batch)
 			// save to db
 			c <- 1
-			go func(emailList email.EmailList) {
+			go func(emailList def.EmailList) {
 
 				b, err := json.Marshal(emailList)
 				if err != nil {
@@ -313,9 +312,4 @@ func countFiles(fileSystem fs.FS) (float64, error) {
 	elapsed := time.Since(start)
 	log.Printf("Counted %0.f files in %v", fileCounter, elapsed)
 	return fileCounter, nil
-}
-
-func (i *indexService) Indexer() error {
-	i.storage.Indexer()
-	return nil
 }

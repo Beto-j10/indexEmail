@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
+
+	def "server/pkg/definitions"
 )
 
 // m type builds a map structure quickly to send to a Responder
@@ -57,6 +60,69 @@ func (s *Server) indexer() http.HandlerFunc {
 		}
 
 		m := m{"message": "success"}
+		wJSON(w, m, http.StatusOK)
+	}
+}
+
+func (s *Server) searchMail() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		if r.Method != http.MethodGet {
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+
+		if search := r.URL.Query().Get("search"); search == "" {
+			http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+			return
+		}
+
+		var err error
+
+		intPage := 1
+		if r.URL.Query().Has("page") {
+			if intPage, err = strconv.Atoi(r.URL.Query().Get("page")); err != nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+
+			if intPage < 1 {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+		}
+
+		intPageSize := 50
+		if r.URL.Query().Has("pageSize") {
+			if intPageSize, err = strconv.Atoi(r.URL.Query().Get("pageSize")); err != nil {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+
+			if intPageSize < 1 {
+				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+				return
+			}
+		}
+
+		query := &def.Query{
+			Search:   r.URL.Query().Get("search"),
+			Source:   r.URL.Query().Get("source"),
+			Page:     intPage,
+			PageSize: intPageSize,
+		}
+
+		response, err := s.indexService.SearchMail(query)
+		if err != nil {
+			log.Printf("Error searching mail: %v", err)
+			http.Error(w, http.StatusText(500), http.StatusInternalServerError)
+			return
+		}
+
+		m := m{
+			"statusCode": 200,
+			"emails":     response,
+		}
 		wJSON(w, m, http.StatusOK)
 	}
 }
