@@ -8,7 +8,7 @@ func (s *Server) routes() *chi.Mux {
 		router.Get("/ping", s.ping())
 		router.Get("/index", s.indexMail())
 		router.Get("/indexer", s.indexer())
-		router.Get("/search", s.searchMail())
+		router.Get("/emails", s.searchMail())
 	})
 	return router
 }

@@ -70,8 +70,6 @@ func (s *storage) SearchMail(search *def.Search) (*def.SearchResponse, error) {
 		return nil, err
 	}
 
-	fmt.Printf("Search results: %v \n", resp)
-
 	return resp, nil
 
 }

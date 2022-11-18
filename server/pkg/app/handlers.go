@@ -12,9 +12,9 @@ import (
 // m type builds a map structure quickly to send to a Responder
 type m map[string]interface{}
 
-// wJSON marshals 'm' to JSON and setting the
+// wJSON marshals 'response' to JSON and setting the
 // Content-Type as application/json.
-func wJSON(w http.ResponseWriter, response m, code int) {
+func wJSON(w http.ResponseWriter, response interface{}, code int) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	r, err := json.Marshal(response)
@@ -93,8 +93,8 @@ func (s *Server) searchMail() http.HandlerFunc {
 		}
 
 		intPageSize := 50
-		if r.URL.Query().Has("pageSize") {
-			if intPageSize, err = strconv.Atoi(r.URL.Query().Get("pageSize")); err != nil {
+		if r.URL.Query().Has("page-size") {
+			if intPageSize, err = strconv.Atoi(r.URL.Query().Get("page-size")); err != nil {
 				http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 				return
 			}
@@ -107,7 +107,6 @@ func (s *Server) searchMail() http.HandlerFunc {
 
 		query := &def.Query{
 			Search:   r.URL.Query().Get("search"),
-			Source:   r.URL.Query().Get("source"),
 			Page:     intPage,
 			PageSize: intPageSize,
 		}
@@ -119,10 +118,6 @@ func (s *Server) searchMail() http.HandlerFunc {
 			return
 		}
 
-		m := m{
-			"statusCode": 200,
-			"emails":     response,
-		}
-		wJSON(w, m, http.StatusOK)
+		wJSON(w, response, http.StatusOK)
 	}
 }

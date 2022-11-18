@@ -48,7 +48,8 @@ type hits struct {
 		Value int `json:"value"`
 	} `json:"total"`
 	Hits []struct {
-		Source Email `json:"_source"`
+		ID     string `json:"_id"`
+		Source Email  `json:"_source"`
 	} `json:"hits"`
 }
 
