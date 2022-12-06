@@ -75,7 +75,7 @@ func (s *storage) SearchMail(search *def.Search) (*def.SearchResponse, error) {
 }
 
 func (s *storage) Indexer() {
-	files, err := os.ReadDir("./emails")
+	files, err := os.ReadDir(s.config.Server.DirRootBatch)
 	if err != nil {
 		log.Panicf("error reading directory: %+v", err)
 	}
@@ -100,7 +100,7 @@ func (s *storage) Indexer() {
 			// 	log.Panicf("error marshalling email: %v", err)
 			// }
 
-			file, err := os.Open("./emails/" + fileName)
+			file, err := os.Open(s.config.Server.DirRootBatch + fileName)
 			if err != nil {
 				log.Panicf("error opening file: %v", err)
 			}

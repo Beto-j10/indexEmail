@@ -105,6 +105,12 @@ func (s *Server) searchMail() http.HandlerFunc {
 			}
 		}
 
+		if intPageSize*intPage > 30000 {
+			m := m{"message": "too many results. max 30000"}
+			wJSON(w, m, http.StatusBadRequest)
+			return
+		}
+
 		query := &def.Query{
 			Search:   r.URL.Query().Get("search"),
 			Page:     intPage,

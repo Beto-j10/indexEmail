@@ -73,7 +73,7 @@ func (i *indexService) IndexMail() error {
 	}
 
 	wg2.Add(1)
-	go createFiles(results, &wg2)
+	go createFiles(results, &wg2, i.config.Server)
 
 	var fileCounter float64
 
@@ -98,8 +98,6 @@ func (i *indexService) IndexMail() error {
 	wg.Wait()
 	close(results)
 	wg2.Wait()
-
-	// i.storage.Indexer()
 
 	return nil
 }
@@ -245,9 +243,12 @@ func (f *fillEmail) fillEmails(b *strings.Builder) {
 	}
 }
 
-func createFiles(result <-chan *def.Email, wg *sync.WaitGroup) {
+func createFiles(result <-chan *def.Email, wg *sync.WaitGroup, conf config.ServerConfig) {
 
 	defer wg.Done()
+	if os.Getenv("ENV") != "test" {
+		os.Mkdir(conf.DirRootBatch, 0755)
+	}
 
 	emailList := &def.EmailList{}
 	counter := 0
@@ -259,7 +260,7 @@ func createFiles(result <-chan *def.Email, wg *sync.WaitGroup) {
 		if counter == 5000 {
 
 			batch++
-			name := fmt.Sprintf("./emails/index-%d.json", batch)
+			name := fmt.Sprintf(conf.DirBatch, batch)
 			// save to db
 			c <- 1
 			go func(emailList def.EmailList) {
@@ -283,7 +284,7 @@ func createFiles(result <-chan *def.Email, wg *sync.WaitGroup) {
 	if err != nil {
 		log.Panicf("Error marshalling to json: %v", err)
 	}
-	os.WriteFile("./emails/index-final.json", b, 0644)
+	os.WriteFile(conf.DirFinalBatch, b, 0644)
 
 }
 

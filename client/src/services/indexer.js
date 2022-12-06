@@ -14,7 +14,8 @@ export async function getEmails(query) {
             throw new Error(response.statusText);
         }
         const data = await response.json();
-        return data.hits.hits;
+        // window.history.pushState({}, '', `/?${query}`);
+        return data;
     } catch (error) {
         console.error(error);
     }

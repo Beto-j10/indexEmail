@@ -20,8 +20,13 @@ type Zinc struct {
 
 // ServerConfig is the config for the server
 type ServerConfig struct {
-	Port string `yaml:"port"`
-	Dir  string `yaml:"dir"`
+	Port           string `yaml:"port"`
+	Dir            string `yaml:"dir"`
+	DirRootBatch   string `yaml:"dir_root_batch"`
+	NameBatch      string `yaml:"name_batch"`
+	NameFinalBatch string `yaml:"name_final_batch"`
+	DirBatch       string `yaml:"dir_batch"`
+	DirFinalBatch  string `yaml:"dir_final_batch"`
 }
 
 // Config contains the configuration for the server
@@ -44,15 +49,17 @@ func LoadConfig(filename string) (*Config, error) {
 		return nil, err
 	}
 
+	config.Server.DirBatch = config.Server.DirRootBatch + config.Server.NameBatch
+	config.Server.DirFinalBatch = config.Server.DirRootBatch + config.Server.NameFinalBatch
 	serverPort := flag.String("port", config.Server.Port, "server port")
-	serverDir := flag.String("dir", "default", "server directory")
+	// serverDir := flag.String("dir", "default", "server directory")
 	zincHost := flag.String("zincHost", config.Zinc.ZincHost, "zinc host")
 	zincTarget := flag.String("target", config.Zinc.Target, "target")
 
 	flag.Parse()
 
 	config.Server.Port = *serverPort
-	config.Server.Dir = *serverDir
+	// config.Server.Dir = *serverDir
 	config.Zinc.ZincHost = *zincHost
 	config.Zinc.Target = *zincTarget
 

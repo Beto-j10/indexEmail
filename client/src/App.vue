@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { getEmails } from './services/indexer';
+import Pagination from './components/Pagination.vue'
 
 const search = ref('')
 const emails = ref([])
@@ -9,6 +10,16 @@ const query = ref('')
 const messageBody = ref('')
 const messageSubject = ref('')
 const isMessageVisible = ref(false)
+const response = ref({})
+const pageSize = ref(50)
+const totalPages = ref(0)
+const totalEmails = ref(0)
+const currentPage = ref(1)
+const leftPageNumbers = ref([])
+const rightPageNumbers = ref([])
+const middlePageNumbers = ref([])
+const showMiddlePageNumbers = ref(false)
+const showLeftPageDots = ref(true)
 
 const handleArrow = () => {
     isMessageVisible.value = !isMessageVisible.value
@@ -20,17 +31,72 @@ const handleClickEmail = (email) => {
     isMessageVisible.value = true
 }
 
-const searchEmails = async (query) => {
+const handlePagination = (page) => {
+    const total = totalPages.value;
+    const isTotalLessThanOrEqualToThree = total <= 3;
+    const isPageInMiddle = page > 3 && page <= total - 3;
+
+    currentPage.value = page
+
+    if (isPageInMiddle) {
+        leftPageNumbers.value = [1];
+        rightPageNumbers.value = [total];
+        middlePageNumbers.value = [page - 1, page, page + 1];
+        showMiddlePageNumbers.value = true;
+    } else if (page <= 3) {
+        if (isTotalLessThanOrEqualToThree) {
+            for (let i = 1; i <= total; i++) {
+                leftPageNumbers.value.push(i);
+            }
+            showLeftPageDots.value = false;
+        } else {
+            leftPageNumbers.value = [1, 2, 3];
+            rightPageNumbers.value = [total];
+        }
+    } else if (page >= total - 3) {
+        leftPageNumbers.value = [1];
+        rightPageNumbers.value = [total - 2, total - 1, total];
+    }
+};
+
+
+
+const searchEmails = async (query, page) => {
     loading.value = true
-    emails.value = await getEmails(query)
+    response.value = await getEmails(query)
+    emails.value = response.value.hits.hits
+    totalEmails.value = response.value.hits.total.value > 30000 ? 30000 : response.value.hits.total.value
+    totalPages.value = Math.ceil(totalEmails.value / pageSize.value)
+    console.log(totalPages.value)
+    resetPagination()
+    handlePagination(page)
+    highlight(search.value)
     loading.value = false
 }
 
-function handleSearch() {
+function highlight(text) {
+    var inputText = document.getElementById("default-search");
+    var innerHTML = inputText.innerHTML;
+    var index = innerHTML.indexOf(text);
+    if (index >= 0) {
+        innerHTML = innerHTML.substring(0, index) + "<span class='highlight'>" + innerHTML.substring(index, index + text.length) + "</span>" + innerHTML.substring(index + text.length);
+        inputText.innerHTML = innerHTML;
+    }
+}
+
+const resetPagination = () => {
+    leftPageNumbers.value = []
+    rightPageNumbers.value = []
+    middlePageNumbers.value = []
+    showMiddlePageNumbers.value = false
+    showLeftPageDots.value = true
+}
+
+function handleSearch(page = 1) {
     isMessageVisible.value = false
-    query.value = `search=${search.value}&page=1&page-size=100`
-    console.log(search.value)
-    searchEmails(query.value)
+    console.log("page====", page)
+    query.value = `search=${search.value}&page=${page}&page-size=${pageSize.value}`
+    searchEmails(query.value, page)
 }
 
 </script>
@@ -57,7 +123,7 @@ function handleSearch() {
 
         <main class="flex flex-col h-full overflow-hidden">
             <div class="w-full max-w-5xl m-auto">
-                <form @submit.prevent="handleSearch">
+                <form @submit.prevent="handleSearch()">
                     <label for="default-search"
                         class="mb-2 text-sm font-medium text-gray-900 sr-only dark:text-white">Search</label>
                     <div class="relative">
@@ -82,46 +148,121 @@ function handleSearch() {
             </div>
 
             <div class="grow flex flex-col m-0 p-0 mt-4 h-full overflow-hidden pb-1 lg:flex-row">
-                <div class="grow h-full max-h-full overflow-scroll shadow-md sm:rounded-lg">
-                    <table class="w-[639px] table-fixed text-sm text-left text-gray-500 sm:w-full">
-                        <thead class="sticky top-0 leading-8 text-xs uppercase bg-gray-100">
-                            <tr class="">
-                                <th scope="col" class=" py-3 px-5 font-semibold">
-                                    Subject
-                                </th>
-                                <th scope="col" class=" py-3 px-5 font-semibold">
-                                    From
-                                </th>
-                                <th scope="col" class=" py-3 px-5 font-semibold">
-                                    To
-                                </th>
-                                <th scope="col" class=" py-3 px-5 font-semibold">
-                                    Date
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="bg-white border-b break-words cursor-pointer" v-for="email in emails"
-                                :key="email._id" @click="handleClickEmail(email)">
-                                <td class="p-2 lg:py-3">
-                                    {{ email._source.subject }}
-                                </td>
-                                <td class="p-2 lg:py-3">
-                                    {{ email._source.from }}
-                                </td>
-                                <td class="p-2 lg:py-3">
-                                    {{ email._source.to }}
-                                </td>
-                                <td class="p-2 lg:py-3">
-                                    {{ email._source.date }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <div class="grow flex flex-col h-full overflow-hidden">
+                    <div class="grow h-full max-h-full overflow-scroll shadow-md sm:rounded-lg">
+                        <table class="w-[639px] table-fixed text-sm text-left text-gray-500 sm:w-full">
+                            <thead class="sticky top-0 leading-8 text-xs uppercase bg-gray-100">
+                                <tr class="">
+                                    <th scope="col" class=" py-3 px-5 font-semibold">
+                                        Subject
+                                    </th>
+                                    <th scope="col" class=" py-3 px-5 font-semibold">
+                                        From
+                                    </th>
+                                    <th scope="col" class=" py-3 px-5 font-semibold">
+                                        To
+                                    </th>
+                                    <th scope="col" class=" py-3 px-5 font-semibold">
+                                        Date
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="bg-white border-b break-words cursor-pointer" v-for="email in emails"
+                                    :key="email._id" @click="handleClickEmail(email)">
+                                    <td class="p-2 lg:py-3">
+                                        {{ email._source.subject }}
+                                    </td>
+                                    <td class="p-2 lg:py-3">
+                                        {{ email._source.from }}
+                                    </td>
+                                    <td class="p-2 lg:py-3">
+                                        {{ email._source.to }}
+                                    </td>
+                                    <td class="p-2 lg:py-3">
+                                        {{ email._source.date }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
 
+                    <nav v-if="(totalEmails > 1)"
+                        class="flex justify-between items-center text-xs pt-2 px-2 pr-12 sm:text-sm"
+                        aria-label="Table navigation">
+                        <span class="text-xs font-normal text-gray-500 dark:text-gray-400 sm:text-sm">
+                            <span class="hidden sm:inline">Showing </span>
+                            <span class="font-semibold text-gray-900 dark:text-white">
+                                {{ ((currentPage - 1) * pageSize) + 1 }}
+                                -
+                                {{ (((currentPage - 1) * pageSize)) + emails.length }} </span>
+                            of
+                            <span class="font-semibold text-gray-900 dark:text-white">
+                                {{ totalEmails }}
+                            </span>
+                        </span>
+                        <ul class="inline-flex items-center -space-x-px">
+                            <li>
+                                <a href="#" @click="handleSearch(currentPage - 1)"
+                                    class="block py-1 px-2 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :class="[currentPage === 1 ? 'pointer-events-none' : '']">
+                                    <span class="sr-only">Previous</span>
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" fill="currentColor"
+                                        viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd"
+                                            d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                </a>
+                            </li>
+                            <li v-for="n in leftPageNumbers" :key="n">
+                                <a href="#" @click="handleSearch(n)"
+                                    class="py-1 px-2 leading-tight border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :class="[currentPage === n ? 'bg-gray-200 text-gray-700' : 'bg-white text-gray-500']">
+                                    {{ n }}
+                                </a>
+                            </li>
+
+                            <li v-if="showLeftPageDots">
+                                <a href="#"
+                                    class="py-1 px-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400  cursor-default">...</a>
+                            </li>
+                            <li v-if="showMiddlePageNumbers" v-for="n in middlePageNumbers" :key="n">
+                                <a href="#" @click="handleSearch(n)"
+                                    class="py-1 px-2 leading-tight border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :class="[currentPage === n ? 'bg-gray-200 text-gray-700' : 'bg-white text-gray-500']">
+                                    {{ n }}
+                                </a>
+                            </li>
+                            <li v-if="showMiddlePageNumbers">
+                                <a href="#"
+                                    class="py-1 px-2 leading-tight text-gray-500 bg-white border border-gray-300 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400  cursor-default">...</a>
+                            </li>
+                            <li v-for="n in rightPageNumbers" :key="n">
+                                <a href="#" @click="handleSearch(n)"
+                                    class="py-1 px-2 leading-tight border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :class="[currentPage === n ? 'bg-gray-200 text-gray-700' : 'bg-white text-gray-500']">
+                                    {{ n }}
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#" @click="handleSearch(currentPage + 1)"
+                                    class="block py-1 px-2 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+                                    :class="[currentPage === totalPages ? 'pointer-events-none' : '']">
+                                    <span class="sr-only">Next</span>
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" fill="currentColor"
+                                        viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill-rule="evenodd"
+                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                            clip-rule="evenodd"></path>
+                                    </svg>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
                 <div class="flex relative text-sm transition-all duration-500 ease-in-out lg:w-2/5 lg:min-w-[40%] lg:h-full lg:border-0 lg:mx-5 lg:p-0"
-                    :class="[isMessageVisible ? 'h-60 mt-4 p-2 border-t-2 lg:my-0' : 'h-0 p-0 border-0']">
+                    :class="[isMessageVisible ? 'h-60 mt-2 p-2 border-t-2 lg:my-0' : 'h-0 p-0 border-0']">
                     <div class="absolute -top-7 right-2 cursor-pointer px-2 py-1 transition-all duration-300 ease-in-out
                     bg-gray-100 hover:bg-gray-200 rounded lg:hidden" @click="handleArrow"
                         :class="[isMessageVisible ? '' : 'rotate-180 -top-7']">
@@ -142,5 +283,10 @@ function handleSearch() {
         </main>
     </div>
 
-
 </template>
+
+<style scoped>
+.highlight {
+    background-color: red;
+}
+</style>
